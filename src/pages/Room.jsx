@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import socket from "../socket";
+import socket, { connectAuthenticatedSocket } from "../socket";
 
 const categories = [
   ["animals", "Animals"],
@@ -36,6 +36,10 @@ function Room() {
       navigate("/");
       return;
     }
+    if (!localStorage.getItem("token")) {
+      navigate("/", { replace: true });
+      return;
+    }
 
     const handleRoomUpdate = (roomData) => {
       setPlayers(roomData.players || []);
@@ -55,22 +59,35 @@ function Room() {
       setStarting(false);
       setError(data.message || "Game error");
     };
+    const handleSocketError = (socketError) => {
+      setError(socketError.message || "Unable to connect. Please log in again.");
+    };
+    const joinRoom = () => {
+      socket.emit("join-room", { roomCode }, (response) => {
+        if (!response?.success) {
+          setError(response?.message || "Unable to join this room.");
+        }
+      });
+    };
 
     socket.on("room-updated", handleRoomUpdate);
     socket.on("game-started", handleGameStarted);
     socket.on("room-error", handleRoomError);
     socket.on("game-error", handleGameError);
-
-    socket.emit("join-room", {
-      roomCode,
-      username,
-    });
+    socket.on("connect_error", handleSocketError);
+    socket.on("connect", joinRoom);
+    connectAuthenticatedSocket();
+    if (socket.connected) {
+      joinRoom();
+    }
 
     return () => {
       socket.off("room-updated", handleRoomUpdate);
       socket.off("game-started", handleGameStarted);
       socket.off("room-error", handleRoomError);
       socket.off("game-error", handleGameError);
+      socket.off("connect_error", handleSocketError);
+      socket.off("connect", joinRoom);
     };
   }, [roomCode, username, navigate]);
 

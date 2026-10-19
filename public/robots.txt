@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://draw-ai-ankit.vercel.app/sitemap.xml

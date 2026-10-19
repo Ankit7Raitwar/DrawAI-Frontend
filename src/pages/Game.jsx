@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import socket from "../socket";
+import socket, { connectAuthenticatedSocket } from "../socket";
 import DrawingCanvas from "../components/DrawingCanvas";
 import Chatwindow from "../components/Chatwindow";
 
@@ -27,6 +27,10 @@ function Game() {
   useEffect(() => {
     if (!roomCode || !username) {
       navigate("/");
+      return;
+    }
+    if (!localStorage.getItem("token")) {
+      navigate("/", { replace: true });
       return;
     }
 
@@ -99,6 +103,9 @@ function Game() {
     const handleGameError = (data) => {
       setError(data.message || "Game error");
     };
+    const handleSocketError = (socketError) => {
+      setError(socketError.message || "Unable to connect. Please log in again.");
+    };
 
     socket.on("game-state", handleGameState);
     socket.on("game-started", handleGameStarted);
@@ -110,9 +117,10 @@ function Game() {
     socket.on("game-finished", handleGameFinished);
     socket.on("your-word", handleYourWord);
     socket.on("game-error", handleGameError);
+    socket.on("connect_error", handleSocketError);
 
     const joinGameRoom = () => {
-      socket.emit("join-room", { roomCode, username }, (response) => {
+      socket.emit("join-room", { roomCode }, (response) => {
         if (!response?.success) {
           setError(response?.message || "Unable to join this game.");
           return;
@@ -123,6 +131,7 @@ function Game() {
     };
 
     socket.on("connect", joinGameRoom);
+    connectAuthenticatedSocket();
     if (socket.connected) {
       joinGameRoom();
     }
@@ -138,6 +147,7 @@ function Game() {
       socket.off("game-finished", handleGameFinished);
       socket.off("your-word", handleYourWord);
       socket.off("game-error", handleGameError);
+      socket.off("connect_error", handleSocketError);
       socket.off("connect", joinGameRoom);
     };
   }, [roomCode, username, navigate]);
